@@ -2,7 +2,7 @@ name: AccuRanker preferred URL check
 
 on:
   schedule:
-    - cron: "03 4 * * *"   # kl. 04:13 hver dag
+    - cron: "03 4 * * *"   # kl. 04:03 dansk tid
       timezone: "Europe/Copenhagen"
   workflow_dispatch: {}    # gør det muligt at trigge manuelt til test
 
