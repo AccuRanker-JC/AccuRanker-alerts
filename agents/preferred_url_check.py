@@ -44,7 +44,14 @@ def get_latest_landing_page_path(keyword_obj):
 def load_state():
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+            content = f.read().strip()
+        if not content:
+            return {}
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            print(f"ADVARSEL: {STATE_FILE} indeholdt ugyldig JSON - starter med tom tilstand.")
+            return {}
     return {}
 
 
