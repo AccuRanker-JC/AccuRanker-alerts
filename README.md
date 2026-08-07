@@ -1,41 +1,41 @@
 # AccuRanker Alert Templates
 
-Skabelon-repo til automatiske AccuRanker-alarmer via GitHub Actions. Hver
-kunde bruger **"Use this template"** til at få sin egen kopi, med egne
-secrets/nøgler - ingen kunde-data deles mellem repos.
+Template repository for automated AccuRanker alerts via GitHub Actions. Each
+customer uses **"Use this template"** to get their own copy, with their own
+secrets/keys — no customer data is shared between repos.
 
-Se **[SETUP.md](SETUP.md)** for selve opsætningsguiden.
+See **[SETUP.md](SETUP.md)** for the setup guide itself.
 
-## Struktur
+## Structure
 
 ```
 common/
-  accuranker_client.py   ← delt API-klient (autentificering, pagination)
-  notify.py               ← delt mail-afsendelse (Resend eller SMTP, flere modtagere)
+  accuranker_client.py   ← shared API client (authentication, pagination)
+  notify.py               ← shared email sending (Resend or SMTP, multiple recipients)
 agents/
-  preferred_url_check.py  ← tjekker om preferred URL stadig matcher
+  preferred_url_check.py  ← checks whether the preferred URL still matches
 state/
-  *.json                  ← gemt tilstand pr. agent, så vi kan opdage ÆNDRINGER
-                             (ikke bare rapportere alt der er "forkert" hver dag)
+  *.json                  ← saved state per agent, so we can detect CHANGES
+                             (not just report everything that's "wrong" every day)
 .github/workflows/
-  *.yml                   ← ét workflow pr. agent, egen tidsplan og on/off
+  *.yml                   ← one workflow per agent, own schedule and on/off switch
 ```
 
-## Nuværende agenter
-| Agent | Trigger | Frekvens |
+## Current agents
+| Agent | Trigger | Frequency |
 |---|---|---|
-| `preferred_url_check.py` | Søgeord holdt op med at matche sin preferred landing page | Dagligt |
+| `preferred_url_check.py` | A keyword stopped matching its preferred landing page | Daily |
 
-## Sådan tilføjes en ny agent
-Alle agenter deler samme mønster, så en ny tager typisk kort tid at bygge:
+## How to add a new agent
+All agents share the same pattern, so a new one is typically quick to build:
 
-1. Opret `agents/<navn>_check.py`, brug `preferred_url_check.py` som skabelon
-2. Genbrug `common/accuranker_client.fetch_all_keywords(...)` til data
-3. Genbrug `common/notify.send_email(...)` til alarmering
-4. Gem egen tilstand i `state/<navn>_state.json`
-5. Kopiér `.github/workflows/preferred-url-check.yml` til
-   `.github/workflows/<navn>-check.yml`, og ret filnavnet i `run:`-linjen samt
-   evt. tidsplanen
+1. Create `agents/<name>_check.py`, using `preferred_url_check.py` as a template
+2. Reuse `common/accuranker_client.fetch_all_keywords(...)` for data
+3. Reuse `common/notify.send_email(...)` for alerting
+4. Store its own state in `state/<name>_state.json`
+5. Copy `.github/workflows/preferred-url-check.yml` to
+   `.github/workflows/<name>-check.yml`, and update the filename in the
+   `run:` line as well as the schedule if needed
 
-Planlagte/fremtidige agenter (ikke bygget endnu): rank-fald, share of
-voice-fald, AI Overview-ændringer.
+Planned/future agents (not built yet): rank drops, share of voice drops,
+AI Overview changes.

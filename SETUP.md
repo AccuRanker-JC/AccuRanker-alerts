@@ -1,68 +1,71 @@
-# Opsætning
+# Setup
 
-Denne guide gælder for alle agenter i dette repo (fx `preferred_url_check.py`).
-Følg den én gang - agenterne deler den samme opsætning.
+This guide applies to all agents in this repo (e.g. `preferred_url_check.py`).
+Follow it once — the agents share the same setup.
 
-## 1. Opret dit eget repo fra skabelonen
-Klik **"Use this template"** på skabelon-repo'et → giv dit nye repo et navn →
-**Create repository**. Du får nu en fuld kopi, uden git-historik fra
-skabelonen, som du selv ejer og styrer.
+## 1. Create your own repo from the template
+Click **"Use this template"** on the template repo → give your new repo a
+name → **Create repository**. You now get a full copy, without the
+template's git history, which you own and control yourself.
 
-## 2. Repository variables (ikke-følsomme indstillinger)
-**Settings → Secrets and variables → Actions → fanen "Variables" → New
+## 2. Repository variables (non-sensitive settings)
+**Settings → Secrets and variables → Actions → "Variables" tab → New
 repository variable.**
 
-| Navn | Værdi | Forklaring |
+| Name | Value | Explanation |
 |---|---|---|
-| `ACCURANKER_DOMAIN_ID` | fx `343517` | Find det i AccuRanker under domænets indstillinger, eller spørg din AccuRanker-kontakt |
-| `EMAIL_METHOD` | `resend` eller `smtp` | Se afsnit 4 |
-| `ALERT_EMAIL_FROM` | fx `alerts@dinvirksomhed.dk` | Afsenderadresse på alarmerne |
+| `ACCURANKER_DOMAIN_ID` | e.g. `343517` | Find it in AccuRanker under the domain's settings, or ask your AccuRanker contact |
+| `EMAIL_METHOD` | `resend` or `smtp` | See section 4 |
+| `ALERT_EMAIL_FROM` | e.g. `alerts@yourcompany.com` | Sender address for the alerts |
 
-## 3. Secrets (følsomme nøgler)
-**Samme sted, men fanen "Secrets".**
+## 3. Secrets (sensitive keys)
+**Same place, but the "Secrets" tab.**
 
-| Navn | Værdi |
+| Name | Value |
 |---|---|
-| `ACCURANKER_API_KEY` | Din AccuRanker API-nøgle (Kontoindstillinger → API) |
-| `ALERT_EMAILS` | Modtagere, kommasepareret: `person1@firma.dk,person2@firma.dk` |
+| `ACCURANKER_API_KEY` | Your AccuRanker API key (Account settings → API) |
+| `ALERT_EMAILS` | Recipients, comma-separated: `person1@company.com,person2@company.com` |
 
-Plus **enten** Resend- **eller** SMTP-secrets, afhængig af dit valg i punkt 4.
+Plus **either** Resend **or** SMTP secrets, depending on your choice in
+section 4.
 
-## 4. Vælg afsendelsesmetode
+## 4. Choose a sending method
 
-### Mulighed A: Resend (anbefalet til de fleste)
-1. Opret konto på resend.com
-2. **Vigtigt hvis du vil sende til mere end én modtager:** verificér dit eget
-   domæne under Resend → Domains → Add Domain, og følg deres DNS-instruktioner.
-   Uden det kan Resend kun sende til den mail, kontoen selv er oprettet med -
-   det holder ikke i praksis, hvis I er flere stakeholders.
-3. Opret en API-nøgle under Resend → API Keys
+### Option A: Resend (recommended for most)
+1. Create an account at resend.com
+2. **Important if you want to send to more than one recipient:** verify your
+   own domain under Resend → Domains → Add Domain, and follow their DNS
+   instructions. Without this, Resend can only send to the email the account
+   itself was created with — that doesn't work in practice if you have
+   multiple stakeholders.
+3. Create an API key under Resend → API Keys
 4. Secrets: `RESEND_API_KEY`
-5. Sæt `ALERT_EMAIL_FROM` til en adresse på dit verificerede domæne, fx
-   `alerts@dinvirksomhed.dk` (ikke `onboarding@resend.dev`, som kun er til
-   hurtig test med én modtager)
+5. Set `ALERT_EMAIL_FROM` to an address on your verified domain, e.g.
+   `alerts@yourcompany.com` (not `onboarding@resend.dev`, which is only for
+   quick testing with a single recipient)
 
-### Mulighed B: SMTP (hvis I allerede har en mailserver)
-Secrets: `SMTP_HOST`, `SMTP_PORT` (typisk 587), `SMTP_USERNAME`, `SMTP_PASSWORD`.
+### Option B: SMTP (if you already have a mail server)
+Secrets: `SMTP_HOST`, `SMTP_PORT` (typically 587), `SMTP_USERNAME`,
+`SMTP_PASSWORD`.
 
-## 5. Test det
-**Actions**-fanen → vælg workflowet → **Run workflow**. Første kørsel sender
-ingen mail (den gemmer bare en baseline) - det er forventet. Kør den igen for
-at bekræfte, at logikken virker som ventet, eller lav en midlertidig
-testændring i AccuRanker for at trigge en reel alarm.
+## 5. Test it
+**Actions** tab → select the workflow → **Run workflow**. The first run
+sends no email (it just saves a baseline) — that's expected. Run it again
+to confirm the logic works as intended, or make a temporary test change in
+AccuRanker to trigger a real alert.
 
-## 6. Løbende drift
-Workflowet kører derefter automatisk på det skema, der står i selve
-workflow-filen (`.github/workflows/*.yml`). Du kan altid pause en agent via
-**Actions → vælg workflow → ••• → Disable workflow**, eller justere
-tidspunktet ved at redigere `cron`-linjen.
+## 6. Ongoing operation
+The workflow then runs automatically on the schedule set in the workflow
+file itself (`.github/workflows/*.yml`). You can always pause an agent via
+**Actions → select workflow → ••• → Disable workflow**, or adjust the
+timing by editing the `cron` line.
 
-## Fejlfinding
-- **Ingen mail, selvom du forventede det:** tjek loggen for "Kør ...-tjek" i
-  Actions - den fortæller om `state`-filen fandtes fra før (så det ikke er
-  første kørsel).
-- **Fejl fra Resend om afsender/modtager:** næsten altid domæneverificering,
-  der mangler (se punkt 4A).
-- **state-filen opdateres ikke:** tjek at `permissions: contents: write` står
-  i workflow-filen (den følger med skabelonen, men kan være slettet ved en
-  fejl).
+## Troubleshooting
+- **No email, even though you expected one:** check the log for "Run
+  ...-check" in Actions — it will tell you whether the `state` file already
+  existed (so it's not the first run).
+- **Error from Resend about sender/recipient:** almost always missing
+  domain verification (see section 4A).
+- **State file isn't updating:** check that `permissions: contents: write`
+  is present in the workflow file (it ships with the template, but could be
+  removed by mistake).
