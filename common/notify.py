@@ -1,12 +1,13 @@
 """
-Delt mail-afsendelse for alle agenter. Understøtter to metoder, valgt via
-env-variablen EMAIL_METHOD ("resend" eller "smtp"), og altid flere modtagere
-via ALERT_EMAILS (kommasepareret liste).
+Shared email sending for all agents. Supports two methods, chosen via the
+EMAIL_METHOD environment variable ("resend" or "smtp"), and always supports
+multiple recipients via ALERT_EMAILS (comma-separated list).
 
-Resend uden domæneverificering ("onboarding@resend.dev") kan KUN sende til
-den mail-adresse, Resend-kontoen selv er oprettet med - det holder derfor
-ikke i praksis, hvis en kunde vil have flere modtagere. Til det skal enten
-Resend-domænet verificeres, eller SMTP bruges i stedet.
+Resend without domain verification ("onboarding@resend.dev") can ONLY send
+to the email address the Resend account itself was created with — that
+doesn't work in practice if a customer wants multiple recipients. For that,
+either the Resend domain needs to be verified, or SMTP should be used
+instead.
 """
 
 import os
@@ -22,16 +23,16 @@ def _get_recipients():
     recipients = [e.strip() for e in raw.split(",") if e.strip()]
     if not recipients:
         raise RuntimeError(
-            "ALERT_EMAILS er ikke sat. Skal være en kommasepareret liste af "
-            "modtagere, fx 'person1@firma.dk,person2@firma.dk'."
+            "ALERT_EMAILS is not set. Must be a comma-separated list of "
+            "recipients, e.g. 'person1@company.com,person2@company.com'."
         )
     return recipients
 
 
 def send_email(subject, text_body, html_body=None):
-    """Sender en mail. html_body er valgfri - hvis den angives, sendes mailen
-    som både HTML og ren tekst (klienter der ikke kan vise HTML falder
-    automatisk tilbage til text_body)."""
+    """Sends an email. html_body is optional — if provided, the email is
+    sent as both HTML and plain text (clients that can't render HTML
+    automatically fall back to text_body)."""
     recipients = _get_recipients()
     method = os.environ.get("EMAIL_METHOD", "resend").lower()
 
@@ -40,7 +41,7 @@ def send_email(subject, text_body, html_body=None):
     elif method == "resend":
         _send_via_resend(subject, text_body, recipients, html_body)
     else:
-        raise RuntimeError(f"Ukendt EMAIL_METHOD: '{method}'. Skal være 'resend' eller 'smtp'.")
+        raise RuntimeError(f"Unknown EMAIL_METHOD: '{method}'. Must be 'resend' or 'smtp'.")
 
 
 def _send_via_resend(subject, text_body, recipients, html_body=None):
@@ -49,9 +50,10 @@ def _send_via_resend(subject, text_body, recipients, html_body=None):
 
     if sender == "onboarding@resend.dev" and len(recipients) > 1:
         print(
-            "ADVARSEL: du bruger Resends test-afsender med flere modtagere. "
-            "Det vil sandsynligvis fejle for alle modtagere udover kontoens "
-            "egen e-mail. Verificér et domæne i Resend, eller skift til SMTP.",
+            "WARNING: you are using Resend's test sender with multiple "
+            "recipients. This will likely fail for every recipient other "
+            "than the account's own email. Verify a domain in Resend, or "
+            "switch to SMTP.",
         )
 
     payload = {"from": sender, "to": recipients, "subject": subject, "text": text_body}

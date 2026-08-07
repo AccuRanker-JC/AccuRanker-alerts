@@ -1,7 +1,7 @@
 """
-Delt klient til AccuRanker API'et. Alle "agenter" (tjek-scripts) i dette repo
-bruger denne, så vi kun skal vedligeholde ét sted for autentificering,
-pagination og fejlhåndtering.
+Shared client for the AccuRanker API. All "agents" (check scripts) in this
+repo use this, so we only need to maintain authentication, pagination, and
+error handling in one place.
 """
 
 import time
@@ -18,9 +18,9 @@ def _headers(api_key):
 
 
 def fetch_all_keywords(api_key, domain_id, fields):
-    """Henter alle søgeord for et domæne, med automatisk pagination.
+    """Fetches all keywords for a domain, with automatic pagination.
 
-    fields: kommasepareret string, fx
+    fields: comma-separated string, e.g.
         "id,keyword,preferred_landing_page,ranks.landing_page,ranks.created_at"
     """
     keywords = []
@@ -40,6 +40,6 @@ def fetch_all_keywords(api_key, domain_id, fields):
         if len(batch) < limit:
             break
         offset += limit
-        time.sleep(0.5)  # vær pæn overfor rate-limit (100 req/min)
+        time.sleep(0.5)  # be polite towards the rate limit (100 req/min)
 
     return keywords
