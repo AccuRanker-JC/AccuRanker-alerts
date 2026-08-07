@@ -62,29 +62,29 @@ def save_state(state):
 
 
 def build_text_body(regressions):
-    """Ren tekst-udgave (bruges som fallback for mailklienter uden HTML-visning)."""
+    """Plain text version (fallback for email clients without HTML rendering)."""
     lines = []
     for r in regressions:
-        current = r["current"] or "(ranker slet ikke)"
+        current = r["current"] or "(not ranking at all)"
         lines.append(
             f"{r['keyword']} ({r['search_type']})\n"
-            f"  Preferred:  {r['preferred']}\n"
-            f"  Ranker nu:  {current}\n"
+            f"  Preferred:      {r['preferred']}\n"
+            f"  Currently ranking on: {current}\n"
         )
     return (
-        f"{len(regressions)} søgeord er stoppet med at matche deres preferred URL:\n\n"
+        f"{len(regressions)} keyword(s) have stopped matching their preferred URL:\n\n"
         + "\n".join(lines)
-        + "\nTjek AccuRanker for detaljer."
+        + "\nCheck AccuRanker for details."
     )
 
 
 def build_html_body(regressions):
-    """HTML-tabel med søgeord i fed, enhed (Desktop/Mobile), preferred URL og
-    hvad der faktisk ranker nu. Inline CSS, da de fleste mailklienter
-    ignorerer eksterne stylesheets."""
+    """HTML table with the keyword in bold, device (Desktop/Mobile), the
+    preferred URL, and what is actually ranking now. Inline CSS, since most
+    email clients ignore external stylesheets."""
     rows = []
     for r in regressions:
-        current = r["current"] or "(ranker slet ikke)"
+        current = r["current"] or "(not ranking at all)"
         rows.append(
             "<tr>"
             f"<td style='padding:8px 12px;border-bottom:1px solid #eee;'><strong>{r['keyword']}</strong></td>"
@@ -96,17 +96,17 @@ def build_html_body(regressions):
 
     return (
         "<div style='font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;'>"
-        f"<p>{len(regressions)} søgeord er stoppet med at matche deres preferred URL:</p>"
+        f"<p>{len(regressions)} keyword(s) have stopped matching their preferred URL:</p>"
         "<table style='border-collapse:collapse;width:100%;'>"
         "<thead><tr>"
-        "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Søgeord</th>"
-        "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Enhed</th>"
+        "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Keyword</th>"
+        "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Device</th>"
         "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Preferred URL</th>"
-        "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Ranker nu på</th>"
+        "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Currently ranking on</th>"
         "</tr></thead>"
         f"<tbody>{''.join(rows)}</tbody>"
         "</table>"
-        "<p style='margin-top:16px;'>Tjek AccuRanker for detaljer.</p>"
+        "<p style='margin-top:16px;'>Check AccuRanker for details.</p>"
         "</div>"
     )
 
@@ -153,7 +153,7 @@ def main():
         text_body = build_text_body(regressions)
         html_body = build_html_body(regressions)
         send_email(
-            f"AccuRanker: {len(regressions)} preferred URL-mismatch(es)",
+            f"AccuRanker: {len(regressions)} preferred URL mismatch(es)",
             text_body,
             html_body,
         )
