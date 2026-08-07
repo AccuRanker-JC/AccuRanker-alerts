@@ -2,9 +2,9 @@ name: AccuRanker preferred URL check
 
 on:
   schedule:
-    - cron: "03 4 * * *"   # kl. 04:03 dansk tid
+    - cron: "3 4 * * *"   # 04:03 Copenhagen time (handles DST automatically)
       timezone: "Europe/Copenhagen"
-  workflow_dispatch: {}    # gør det muligt at trigge manuelt til test
+  workflow_dispatch: {}    # allows manual triggering for testing
 
 permissions:
   contents: write
@@ -21,10 +21,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Installer dependencies
+      - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Kør preferred URL-tjek
+      - name: Run preferred URL check
         env:
           ACCURANKER_API_KEY: ${{ secrets.ACCURANKER_API_KEY }}
           ACCURANKER_DOMAIN_ID: ${{ vars.ACCURANKER_DOMAIN_ID }}
@@ -38,10 +38,10 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
         run: python agents/preferred_url_check.py
 
-      - name: Gem opdateret tilstand
+      - name: Save updated state
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add state/
-          git diff --quiet --cached || git commit -m "Opdater tilstand: preferred URL-tjek"
+          git diff --quiet --cached || git commit -m "Update state: preferred URL check"
           git push
