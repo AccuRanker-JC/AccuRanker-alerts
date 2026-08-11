@@ -43,5 +43,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add state/
-          git diff --quiet --cached || git commit -m "Update state: rank 1 with top ad check"
-          git push
+          if git diff --quiet --cached; then
+            echo "No state changes to commit."
+            exit 0
+          fi
+          git commit -m "Update state: rank 1 with top ad check"
+          for i in 1 2 3 4 5; do
+            if git pull --rebase origin main && git push; then
+              exit 0
+            fi
+            echo "Push attempt $i failed, retrying..."
+            sleep $((i * 5))
+          done
+          echo "Failed to push after several retries."
+          exit 1
