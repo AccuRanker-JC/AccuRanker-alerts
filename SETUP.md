@@ -14,7 +14,7 @@ repository variable.**
 
 | Name | Value | Explanation |
 |---|---|---|
-| `ACCURANKER_DOMAIN_ID` | e.g. `343517` | Find it in AccuRanker under the domain's settings, or ask your AccuRanker contact |
+| `ACCURANKER_DOMAIN_ID` | e.g. `343517` or `343517,534653` | One domain, or several comma-separated domain IDs to monitor with a single agent. Find them in AccuRanker under each domain's settings |
 | `EMAIL_METHOD` | `resend` or `smtp` | See section 4 |
 | `ALERT_EMAIL_FROM` | e.g. `alerts@yourcompany.com` | Sender address for the alerts |
 
@@ -24,7 +24,19 @@ repository variable.**
 | Name | Value |
 |---|---|
 | `ACCURANKER_API_KEY` | Your AccuRanker API key (Account settings → API) |
-| `ALERT_EMAILS` | Recipients, comma-separated: `person1@company.com,person2@company.com` |
+
+Plus **one recipient secret per agent** — this lets each check send to
+different stakeholders if needed, without touching any code:
+
+| Name | Value |
+|---|---|
+| `ALERT_EMAILS_PREFERRED_URL` | Recipients for the preferred URL check, comma-separated |
+| `ALERT_EMAILS_TOP3_RANK` | Recipients for the top 3 rank drop check |
+| `ALERT_EMAILS_ADS_TOP` | Recipients for the rank 1 + top ad check |
+
+If you want the same people to receive everything, just use the same list
+of addresses in all three secrets — it's still one secret per agent, just
+with identical values.
 
 Plus **either** Resend **or** SMTP secrets, depending on your choice in
 section 4.

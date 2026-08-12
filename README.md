@@ -24,7 +24,9 @@ state/
 ## Current agents
 | Agent | Trigger | Frequency |
 |---|---|---|
-| `preferred_url_check.py` | A keyword stopped matching its preferred landing page | Daily |
+| `preferred_url_check.py` | A keyword stopped matching its preferred landing page (only if it's still ranking below rank 100 - filters out temporary tracking glitches) | Daily |
+| `top3_rank_drop_check.py` | A keyword dropped out of the top 3 | Daily |
+| `rank1_ads_top_check.py` | A keyword reached rank 1 while a top ad is shown above the organic results (monitors a separate domain, via `ACCURANKER_ADS_TOP_DOMAIN_ID`) | Daily |
 
 ## How to add a new agent
 All agents share the same pattern, so a new one is typically quick to build:
@@ -36,6 +38,9 @@ All agents share the same pattern, so a new one is typically quick to build:
 5. Copy `.github/workflows/preferred-url-check.yml` to
    `.github/workflows/<name>-check.yml`, and update the filename in the
    `run:` line as well as the schedule if needed
+6. Give it its own recipient secret, e.g. `ALERT_EMAILS_<NAME>`, mapped to
+   the `ALERT_EMAILS` environment variable in that workflow file — this
+   lets each agent send to different stakeholders without any code changes
 
 Planned/future agents (not built yet): rank drops, share of voice drops,
 AI Overview changes.
