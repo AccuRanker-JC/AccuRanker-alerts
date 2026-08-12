@@ -6,19 +6,18 @@ ad above the organic results for that search (page_serp_features.ads_top).
 Only triggers on the transition itself ("condition was false -> condition
 is now true"), not every day the condition remains true.
 
-Monitors a DIFFERENT domain than the other agents in this repo - set via
-its own repository variable, ACCURANKER_ADS_TOP_DOMAIN_ID.
+Monitors its own set of domains, separate from the other agents in this
+repo, via ACCURANKER_ADS_TOP_DOMAIN_ID.
 
 Required repository variables (Settings -> Secrets and variables -> Actions -> Variables):
-  ACCURANKER_ADS_TOP_DOMAIN_ID  - the AccuRanker domain_id to monitor (separate from ACCURANKER_DOMAIN_ID)
-  EMAIL_METHOD                   - "resend" or "smtp"
-  ALERT_EMAIL_FROM                - sender address
+  ACCURANKER_ADS_TOP_DOMAIN_ID  - one AccuRanker domain_id, or several
+                                  separated by commas (e.g. "534653,343517")
+  EMAIL_METHOD, ALERT_EMAIL_FROM
 
-Required secrets (same place, under Secrets) - shared with the other agents:
+Required secrets (same place, under Secrets):
   ACCURANKER_API_KEY
-  ALERT_EMAILS                    - comma-separated list of recipients
-  RESEND_API_KEY                  - if EMAIL_METHOD=resend
-  SMTP_HOST / SMTP_PORT / SMTP_USERNAME / SMTP_PASSWORD - if EMAIL_METHOD=smtp
+  ALERT_EMAILS_ADS_TOP    - comma-separated list of recipients
+  RESEND_API_KEY, or the SMTP_* secrets
 """
 
 import json
@@ -33,6 +32,11 @@ STATE_FILE = os.path.join(os.path.dirname(__file__), "..", "state", "rank1_ads_t
 FIELDS = "id,keyword,search_type,ranks.rank,ranks.page_serp_features,ranks.created_at"
 
 SEARCH_TYPE_LABELS = {1: "Desktop", 2: "Mobile"}
+
+
+def get_domain_ids():
+    raw = os.environ["ACCURANKER_ADS_TOP_DOMAIN_ID"]
+    return [d.strip() for d in raw.split(",") if d.strip()]
 
 
 def get_latest_rank_info(keyword_obj):
@@ -70,7 +74,10 @@ def save_state(state):
 def build_text_body(hits):
     lines = []
     for h in hits:
-        lines.append(f"{h['keyword']} ({h['search_type']}) - rank #1, with a top ad shown above it\n")
+        lines.append(
+            f"{h['keyword']} ({h['search_type']}) - domain {h['domain_id']} - "
+            f"rank #1, with a top ad shown above it\n"
+        )
     return (
         f"{len(hits)} keyword(s) reached rank #1 while a top ad is showing above the organic results:\n\n"
         + "\n".join(lines)
@@ -85,6 +92,7 @@ def build_html_body(hits):
             "<tr>"
             f"<td style='padding:8px 12px;border-bottom:1px solid #eee;'><strong>{h['keyword']}</strong></td>"
             f"<td style='padding:8px 12px;border-bottom:1px solid #eee;'>{h['search_type']}</td>"
+            f"<td style='padding:8px 12px;border-bottom:1px solid #eee;'>{h['domain_id']}</td>"
             "<td style='padding:8px 12px;border-bottom:1px solid #eee;'>#1</td>"
             "<td style='padding:8px 12px;border-bottom:1px solid #eee;'>Yes</td>"
             "</tr>"
@@ -97,6 +105,7 @@ def build_html_body(hits):
         "<thead><tr>"
         "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Keyword</th>"
         "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Device</th>"
+        "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Domain</th>"
         "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Rank</th>"
         "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Top ad shown</th>"
         "</tr></thead>"
@@ -109,28 +118,35 @@ def build_html_body(hits):
 
 def main():
     api_key = os.environ["ACCURANKER_API_KEY"]
-    domain_id = os.environ["ACCURANKER_ADS_TOP_DOMAIN_ID"]
-
-    keywords = fetch_all_keywords(api_key, domain_id, FIELDS)
-    print(f"Fetched {len(keywords)} keywords from AccuRanker.")
+    domain_ids = get_domain_ids()
 
     previous_state = load_state()
     is_first_run = len(previous_state) == 0
     new_state = {}
     hits = []
 
-    for kw in keywords:
-        kw_id = str(kw["id"])
-        rank, ads_top = get_latest_rank_info(kw)
-        condition_now = (rank == 1) and ads_top
+    for domain_id in domain_ids:
+        keywords = fetch_all_keywords(api_key, domain_id, FIELDS)
+        print(f"Fetched {len(keywords)} keywords from AccuRanker (domain {domain_id}).")
 
-        was_condition = previous_state.get(kw_id)  # True / False / None
+        for kw in keywords:
+            state_key = f"{domain_id}:{kw['id']}"
+            rank, ads_top = get_latest_rank_info(kw)
+            condition_now = (rank == 1) and ads_top
 
-        if was_condition is False and condition_now is True:
-            search_type_label = SEARCH_TYPE_LABELS.get(kw.get("search_type"), "Unknown")
-            hits.append({"keyword": kw["keyword"], "search_type": search_type_label})
+            was_condition = previous_state.get(state_key)  # True / False / None
 
-        new_state[kw_id] = condition_now
+            if was_condition is False and condition_now is True:
+                search_type_label = SEARCH_TYPE_LABELS.get(kw.get("search_type"), "Unknown")
+                hits.append(
+                    {
+                        "keyword": kw["keyword"],
+                        "search_type": search_type_label,
+                        "domain_id": domain_id,
+                    }
+                )
+
+            new_state[state_key] = condition_now
 
     if is_first_run:
         print("First run: saving baseline, not sending any email yet.")

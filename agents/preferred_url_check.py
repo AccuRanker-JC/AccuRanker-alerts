@@ -7,13 +7,15 @@ page" in AccuRanker no longer does. Only triggers on the transition itself
 match at the last run.
 
 Required repository variables (Settings -> Secrets and variables -> Actions -> Variables):
-  ACCURANKER_DOMAIN_ID   - the AccuRanker domain_id to monitor
+  ACCURANKER_DOMAIN_ID   - one AccuRanker domain_id, or several separated by
+                           commas (e.g. "343517,534653") to monitor multiple
+                           domains from a single agent
   EMAIL_METHOD           - "resend" or "smtp"
   ALERT_EMAIL_FROM        - sender address
 
 Required secrets (same place, under Secrets):
   ACCURANKER_API_KEY
-  ALERT_EMAILS            - comma-separated list of recipients
+  ALERT_EMAILS_PREFERRED_URL - comma-separated list of recipients
   RESEND_API_KEY          - if EMAIL_METHOD=resend
   SMTP_HOST / SMTP_PORT / SMTP_USERNAME / SMTP_PASSWORD - if EMAIL_METHOD=smtp
 """
@@ -37,6 +39,11 @@ SEARCH_TYPE_LABELS = {1: "Desktop", 2: "Mobile"}
 # mismatch is only considered "real" if the keyword is actually ranking, and
 # ranking reasonably well (better than this threshold).
 RANK_NOISE_THRESHOLD = 100
+
+
+def get_domain_ids():
+    raw = os.environ["ACCURANKER_DOMAIN_ID"]
+    return [d.strip() for d in raw.split(",") if d.strip()]
 
 
 def get_latest_rank_info(keyword_obj):
@@ -77,7 +84,7 @@ def build_text_body(regressions):
     for r in regressions:
         current = r["current"] or "(not ranking at all)"
         lines.append(
-            f"{r['keyword']} ({r['search_type']})\n"
+            f"{r['keyword']} ({r['search_type']}) - domain {r['domain_id']}\n"
             f"  Preferred:             {r['preferred']}\n"
             f"  Currently ranking on: {current}\n"
         )
@@ -89,9 +96,9 @@ def build_text_body(regressions):
 
 
 def build_html_body(regressions):
-    """HTML table with the keyword in bold, device (Desktop/Mobile), the
-    preferred URL, and what is actually ranking now. Inline CSS, since most
-    email clients ignore external stylesheets."""
+    """HTML table with the keyword in bold, device (Desktop/Mobile), domain,
+    the preferred URL, and what is actually ranking now. Inline CSS, since
+    most email clients ignore external stylesheets."""
     rows = []
     for r in regressions:
         current = r["current"] or "(not ranking at all)"
@@ -99,6 +106,7 @@ def build_html_body(regressions):
             "<tr>"
             f"<td style='padding:8px 12px;border-bottom:1px solid #eee;'><strong>{r['keyword']}</strong></td>"
             f"<td style='padding:8px 12px;border-bottom:1px solid #eee;'>{r['search_type']}</td>"
+            f"<td style='padding:8px 12px;border-bottom:1px solid #eee;'>{r['domain_id']}</td>"
             f"<td style='padding:8px 12px;border-bottom:1px solid #eee;'>{r['preferred']}</td>"
             f"<td style='padding:8px 12px;border-bottom:1px solid #eee;color:#c0392b;'>{current}</td>"
             "</tr>"
@@ -111,6 +119,7 @@ def build_html_body(regressions):
         "<thead><tr>"
         "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Keyword</th>"
         "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Device</th>"
+        "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Domain</th>"
         "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Preferred URL</th>"
         "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Currently ranking on</th>"
         "</tr></thead>"
@@ -123,41 +132,43 @@ def build_html_body(regressions):
 
 def main():
     api_key = os.environ["ACCURANKER_API_KEY"]
-    domain_id = os.environ["ACCURANKER_DOMAIN_ID"]
-
-    keywords = fetch_all_keywords(api_key, domain_id, FIELDS)
-    print(f"Fetched {len(keywords)} keywords from AccuRanker.")
+    domain_ids = get_domain_ids()
 
     previous_state = load_state()
     is_first_run = len(previous_state) == 0
     new_state = {}
     regressions = []
 
-    for kw in keywords:
-        kw_id = str(kw["id"])
-        preferred = kw.get("preferred_landing_page")
-        preferred_path = preferred.get("path") if preferred else None
-        if preferred_path is None:
-            continue  # no preferred URL set - not relevant to monitor
+    for domain_id in domain_ids:
+        keywords = fetch_all_keywords(api_key, domain_id, FIELDS)
+        print(f"Fetched {len(keywords)} keywords from AccuRanker (domain {domain_id}).")
 
-        current_path, current_rank = get_latest_rank_info(kw)
-        currently_matches = current_path == preferred_path
-        was_matching = previous_state.get(kw_id)
+        for kw in keywords:
+            state_key = f"{domain_id}:{kw['id']}"
+            preferred = kw.get("preferred_landing_page")
+            preferred_path = preferred.get("path") if preferred else None
+            if preferred_path is None:
+                continue  # no preferred URL set - not relevant to monitor
 
-        if was_matching is True and currently_matches is False:
-            is_meaningful = current_rank is not None and current_rank < RANK_NOISE_THRESHOLD
-            if is_meaningful:
-                search_type_label = SEARCH_TYPE_LABELS.get(kw.get("search_type"), "Unknown")
-                regressions.append(
-                    {
-                        "keyword": kw["keyword"],
-                        "search_type": search_type_label,
-                        "preferred": preferred_path,
-                        "current": current_path,
-                    }
-                )
+            current_path, current_rank = get_latest_rank_info(kw)
+            currently_matches = current_path == preferred_path
+            was_matching = previous_state.get(state_key)
 
-        new_state[kw_id] = currently_matches
+            if was_matching is True and currently_matches is False:
+                is_meaningful = current_rank is not None and current_rank < RANK_NOISE_THRESHOLD
+                if is_meaningful:
+                    search_type_label = SEARCH_TYPE_LABELS.get(kw.get("search_type"), "Unknown")
+                    regressions.append(
+                        {
+                            "keyword": kw["keyword"],
+                            "search_type": search_type_label,
+                            "domain_id": domain_id,
+                            "preferred": preferred_path,
+                            "current": current_path,
+                        }
+                    )
+
+            new_state[state_key] = currently_matches
 
     if is_first_run:
         print("First run: saving baseline, not sending any email yet.")

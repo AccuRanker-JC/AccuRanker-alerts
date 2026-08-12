@@ -6,9 +6,16 @@ previous run has dropped out of the top 3 (rank > 3, or not ranking at all)
 on this run. Only triggers on the transition itself ("was top 3 -> no longer
 top 3"), not for keywords that were already outside the top 3 last time.
 
-Shares the same repository variables/secrets as preferred_url_check.py:
-  ACCURANKER_DOMAIN_ID, ACCURANKER_API_KEY, EMAIL_METHOD, ALERT_EMAIL_FROM,
-  ALERT_EMAILS, and either RESEND_API_KEY or the SMTP_* secrets.
+Required repository variables (Settings -> Secrets and variables -> Actions -> Variables):
+  ACCURANKER_DOMAIN_ID   - one AccuRanker domain_id, or several separated by
+                           commas (e.g. "343517,534653") to monitor multiple
+                           domains from a single agent
+  EMAIL_METHOD, ALERT_EMAIL_FROM
+
+Required secrets (same place, under Secrets):
+  ACCURANKER_API_KEY
+  ALERT_EMAILS_TOP3_RANK  - comma-separated list of recipients
+  RESEND_API_KEY, or the SMTP_* secrets
 """
 
 import json
@@ -24,6 +31,11 @@ FIELDS = "id,keyword,search_type,ranks.rank,ranks.created_at"
 TOP_N = 3
 
 SEARCH_TYPE_LABELS = {1: "Desktop", 2: "Mobile"}
+
+
+def get_domain_ids():
+    raw = os.environ["ACCURANKER_DOMAIN_ID"]
+    return [d.strip() for d in raw.split(",") if d.strip()]
 
 
 def get_latest_rank(keyword_obj):
@@ -59,7 +71,7 @@ def build_text_body(drops):
     for d in drops:
         current = f"#{d['current_rank']}" if d["current_rank"] is not None else "(not ranking at all)"
         lines.append(
-            f"{d['keyword']} ({d['search_type']})\n"
+            f"{d['keyword']} ({d['search_type']}) - domain {d['domain_id']}\n"
             f"  Previous rank: #{d['previous_rank']}\n"
             f"  Current rank:  {current}\n"
         )
@@ -78,6 +90,7 @@ def build_html_body(drops):
             "<tr>"
             f"<td style='padding:8px 12px;border-bottom:1px solid #eee;'><strong>{d['keyword']}</strong></td>"
             f"<td style='padding:8px 12px;border-bottom:1px solid #eee;'>{d['search_type']}</td>"
+            f"<td style='padding:8px 12px;border-bottom:1px solid #eee;'>{d['domain_id']}</td>"
             f"<td style='padding:8px 12px;border-bottom:1px solid #eee;'>#{d['previous_rank']}</td>"
             f"<td style='padding:8px 12px;border-bottom:1px solid #eee;color:#c0392b;'>{current}</td>"
             "</tr>"
@@ -90,6 +103,7 @@ def build_html_body(drops):
         "<thead><tr>"
         "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Keyword</th>"
         "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Device</th>"
+        "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Domain</th>"
         "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Previous rank</th>"
         "<th style='text-align:left;padding:8px 12px;border-bottom:2px solid #ccc;'>Current rank</th>"
         "</tr></thead>"
@@ -102,37 +116,39 @@ def build_html_body(drops):
 
 def main():
     api_key = os.environ["ACCURANKER_API_KEY"]
-    domain_id = os.environ["ACCURANKER_DOMAIN_ID"]
-
-    keywords = fetch_all_keywords(api_key, domain_id, FIELDS)
-    print(f"Fetched {len(keywords)} keywords from AccuRanker.")
+    domain_ids = get_domain_ids()
 
     previous_state = load_state()
     is_first_run = len(previous_state) == 0
     new_state = {}
     drops = []
 
-    for kw in keywords:
-        kw_id = str(kw["id"])
-        current_rank = get_latest_rank(kw)
-        currently_top3 = current_rank is not None and current_rank <= TOP_N
+    for domain_id in domain_ids:
+        keywords = fetch_all_keywords(api_key, domain_id, FIELDS)
+        print(f"Fetched {len(keywords)} keywords from AccuRanker (domain {domain_id}).")
 
-        previous = previous_state.get(kw_id)  # dict with "in_top3" and "rank", or None
-        was_top3 = previous.get("in_top3") if previous else None
-        previous_rank = previous.get("rank") if previous else None
+        for kw in keywords:
+            state_key = f"{domain_id}:{kw['id']}"
+            current_rank = get_latest_rank(kw)
+            currently_top3 = current_rank is not None and current_rank <= TOP_N
 
-        if was_top3 is True and currently_top3 is False:
-            search_type_label = SEARCH_TYPE_LABELS.get(kw.get("search_type"), "Unknown")
-            drops.append(
-                {
-                    "keyword": kw["keyword"],
-                    "search_type": search_type_label,
-                    "previous_rank": previous_rank,
-                    "current_rank": current_rank,
-                }
-            )
+            previous = previous_state.get(state_key)  # dict with "in_top3" and "rank", or None
+            was_top3 = previous.get("in_top3") if previous else None
+            previous_rank = previous.get("rank") if previous else None
 
-        new_state[kw_id] = {"in_top3": currently_top3, "rank": current_rank}
+            if was_top3 is True and currently_top3 is False:
+                search_type_label = SEARCH_TYPE_LABELS.get(kw.get("search_type"), "Unknown")
+                drops.append(
+                    {
+                        "keyword": kw["keyword"],
+                        "search_type": search_type_label,
+                        "domain_id": domain_id,
+                        "previous_rank": previous_rank,
+                        "current_rank": current_rank,
+                    }
+                )
+
+            new_state[state_key] = {"in_top3": currently_top3, "rank": current_rank}
 
     if is_first_run:
         print("First run: saving baseline, not sending any email yet.")
